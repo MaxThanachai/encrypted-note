@@ -1,4 +1,7 @@
+import 'package:encrypted_note/const/color.dart';
 import 'package:flutter/material.dart';
+
+import 'package:encrypt/encrypt.dart' as encrypt;
 
 class MyHomePage extends StatefulWidget {
   MyHomePage({Key? key, required this.title}) : super(key: key);
@@ -12,6 +15,16 @@ class _MyHomePageState extends State<MyHomePage> {
   TextEditingController noteController = TextEditingController();
   TextEditingController keyController = TextEditingController();
 
+  bool isEncrypted = false;
+
+  final key = encrypt.Key.fromUtf8('4869502448695024');
+  final iv = encrypt.IV.fromLength(8);
+  dynamic encrypter;
+
+  Color border = lightBlue;
+  Color textFieldColor = white;
+  Color background = whisperGray;
+
   void filterTextInQuote() {
     List<String> splittedStr = noteController.text.split('"');
     for (int i = 0; i < splittedStr.length; i++) {
@@ -19,8 +32,53 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  String encrypting(String plainText) {
+    print(plainText);
+    return encrypter.encrypt(plainText, iv: iv).base64;
+  }
+
+  String decrypting(String encryptedText) {
+    print(encryptedText);
+    encrypt.Encrypted encrypted = encrypt.Encrypted.from64(encryptedText);
+    return encrypter.decrypt(encrypted, iv: iv);
+  }
+
+  void switchColorTheme() {
+    border = isEncrypted ? lightBlue : Colors.red;
+    textFieldColor = isEncrypted ? white : Colors.red[100] as Color;
+    background = isEncrypted ? whisperGray : Colors.red[300] as Color;
+  }
+
+  void toggleEncrypting() {
+    List<String> splittedStr = noteController.text.split('"');
+    String result = '';
+
+    if (!isEncrypted) {
+      for (int i = 0; i < splittedStr.length; i++) {
+        if (i % 2 != 0) {
+          splittedStr[i] = '"' + encrypting(splittedStr[i]) + '"';
+        }
+        result += splittedStr[i];
+      }
+    } else {
+      for (int i = 0; i < splittedStr.length; i++) {
+        if (i % 2 != 0) {
+          splittedStr[i] = '"' + decrypting(splittedStr[i]) + '"';
+        }
+        result += splittedStr[i];
+      }
+    }
+
+    setState(() {
+      switchColorTheme();
+      isEncrypted = !isEncrypted;
+      noteController.text = result;
+    });
+  }
+
   @override
   void initState() {
+    encrypter = encrypt.Encrypter(encrypt.AES(key, mode: encrypt.AESMode.ecb));
     super.initState();
   }
 
@@ -30,14 +88,14 @@ class _MyHomePageState extends State<MyHomePage> {
       margin: EdgeInsets.all(12),
       padding: EdgeInsets.fromLTRB(12, 8, 12, 8),
       decoration: BoxDecoration(
-        color: Colors.blueGrey[900],
+        color: border,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
         children: [
           Icon(
             Icons.vpn_key,
-            color: Colors.white,
+            color: textFieldColor,
           ),
           SizedBox(
             width: 10,
@@ -46,7 +104,7 @@ class _MyHomePageState extends State<MyHomePage> {
             child: Container(
               padding: EdgeInsets.fromLTRB(5, 0, 5, 5),
               decoration: BoxDecoration(
-                color: Colors.blueGrey[300],
+                color: textFieldColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextFormField(
@@ -65,10 +123,11 @@ class _MyHomePageState extends State<MyHomePage> {
         margin: EdgeInsets.all(12),
         padding: EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.blueGrey[300],
+          color: textFieldColor,
           borderRadius: BorderRadius.circular(12),
         ),
         child: TextFormField(
+          enabled: !isEncrypted,
           controller: noteController,
           keyboardType: TextInputType.multiline,
           maxLines: null,
@@ -80,9 +139,10 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.blueGrey[800],
+      backgroundColor: background,
       appBar: AppBar(
         title: Text(widget.title),
+        backgroundColor: border,
       ),
       body: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -92,9 +152,10 @@ class _MyHomePageState extends State<MyHomePage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: filterTextInQuote,
-        tooltip: 'Increment',
-        child: Icon(Icons.add),
+        onPressed: toggleEncrypting,
+        tooltip: isEncrypted ? 'decrypt' : 'encrypt',
+        backgroundColor: border,
+        child: isEncrypted ? Icon(Icons.vpn_key) : Icon(Icons.lock),
       ),
     );
   }
