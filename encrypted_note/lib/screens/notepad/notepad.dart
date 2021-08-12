@@ -1,5 +1,6 @@
-import 'package:encrypted_note/const/color.dart';
 import 'package:flutter/material.dart';
+import 'package:encrypted_note/const/color.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'package:encrypt/encrypt.dart' as encrypt;
 
@@ -12,10 +13,12 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final storage = new FlutterSecureStorage();
+
   TextEditingController noteController = TextEditingController();
   TextEditingController keyController = TextEditingController();
 
-  bool isEncrypted = false;
+  bool isEncrypted = true;
 
   final iv = encrypt.IV.fromLength(8);
 
@@ -23,6 +26,20 @@ class _MyHomePageState extends State<MyHomePage> {
   Color borderColor = blueNeon;
   Color fillColor = blueDark;
   Color backgroundColor = blueBlack;
+
+  Future<void> loadNote() async {
+    String? note = await storage.read(key: 'untitledEncryptedNote');
+    if (note == null) return;
+    print('cannot read note');
+    setState(() {
+      noteController.text = note;
+    });
+  }
+
+  Future<void> saveNote(String note) async {
+    print('Saving . . .');
+    return storage.write(key: 'untitledEncryptedNote', value: note);
+  }
 
   String encrypting(String plainText) {
     encrypt.Key key = encrypt.Key.fromUtf8(keyController.text);
@@ -39,25 +56,39 @@ class _MyHomePageState extends State<MyHomePage> {
     return encrypter.decrypt(encrypted, iv: iv);
   }
 
+  // void switchColorTheme() {
+  //   setState(() {
+  //     textColor = isEncrypted ? blueWhite : redWhite;
+  //     borderColor = isEncrypted ? blueNeon : redNeon;
+  //     fillColor = isEncrypted ? blueDark : redDark;
+  //     backgroundColor = isEncrypted ? blueBlack : redBlack;
+  //   });
+  // }
+
   void switchColorTheme() {
-    textColor = isEncrypted ? blueWhite : redWhite;
-    borderColor = isEncrypted ? blueNeon : redNeon;
-    fillColor = isEncrypted ? blueDark : redDark;
-    backgroundColor = isEncrypted ? blueBlack : redBlack;
+    setState(() {
+      textColor = isEncrypted ? blueWhite : redWhite;
+      borderColor = isEncrypted ? blueNeon : redNeon;
+      fillColor = isEncrypted ? blueDark : redDark;
+      backgroundColor = isEncrypted ? blueBlack : redBlack;
+    });
   }
 
-  void toggleEncrypting() {
+  void toggleEncrypting() async {
     List<String> splittedStr = noteController.text.split('"');
     String result = '';
 
     if (!isEncrypted) {
+      print('encrypting . . .');
       for (int i = 0; i < splittedStr.length; i++) {
         if (i % 2 != 0) {
           splittedStr[i] = '"' + encrypting(splittedStr[i]) + '"';
         }
         result += splittedStr[i];
       }
+      await saveNote(result);
     } else {
+      print('decrypting . . .');
       for (int i = 0; i < splittedStr.length; i++) {
         if (i % 2 != 0) {
           splittedStr[i] = '"' + decrypting(splittedStr[i]) + '"';
@@ -67,14 +98,16 @@ class _MyHomePageState extends State<MyHomePage> {
     }
 
     setState(() {
-      switchColorTheme();
       isEncrypted = !isEncrypted;
+      switchColorTheme();
       noteController.text = result;
     });
   }
 
   @override
   void initState() {
+    loadNote();
+    switchColorTheme();
     super.initState();
   }
 
@@ -88,10 +121,10 @@ class _MyHomePageState extends State<MyHomePage> {
           Expanded(
             child: Center(
               child: Text(
-                'NameTitle',
+                'Untitled encrypted note',
                 style: TextStyle(
                   color: textColor,
-                  fontSize: 24,
+                  fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -192,7 +225,7 @@ class _MyHomePageState extends State<MyHomePage> {
         shape: new CircleBorder(
           side: BorderSide(width: 2, color: textColor),
         ),
-        child: isEncrypted ? Icon(Icons.lock_open) : Icon(Icons.lock_outline),
+        child: isEncrypted ? Icon(Icons.lock_outline) : Icon(Icons.lock_open),
       ),
     );
   }
